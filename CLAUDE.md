@@ -46,7 +46,7 @@ Before you commit, `npm run lint`, `npm run typecheck` and `npm test` must pass.
 ## Infrastructure and secrets
 
 - In `infra/` you may run `terraform fmt` and `terraform validate`. Never run `plan`, `apply` or `destroy`, and never run an `aws` command that changes anything.
-- For AWS, always use the `game-ledger-readonly` profile, which uses the read-only role `claude-readonly`. Never use `game-ledger` or any other profile. If a task needs more access, ask me.
+- For AWS, always use the `game-ledger-readonly` profile, which uses the read-only role `claude-readonly`.
 - Never read, print or commit `.env` files or anything that looks like a credential.
 
 <!-- BEGIN AWS Agent Toolkit rules -->
