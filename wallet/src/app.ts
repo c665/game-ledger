@@ -1,13 +1,13 @@
 import express from "express";
 
 export function createApp() {
-	const app = express();
+  const app = express();
 
-	app.use(express.json());
+  app.use(express.json());
 
-	app.get("/health", (req, res) => {
-		res.json({ status: "OK" });
-	});
+  app.get("/health", (req, res) => {
+    res.json({ status: "OK" });
+  });
 
-	return app;
+  return app;
 }

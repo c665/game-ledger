@@ -1,21 +1,21 @@
 {
-	"name": "game-ledger",
-	"private": true,
-	"engines": {
-		"node": ">=24"
-	},
-	"workspaces": [
-		"wallet"
-	],
-	"scripts": {
-		"typecheck": "npm run typecheck --workspaces --if-present",
-		"test": "npm test --workspaces --if-present",
-		"lint": "biome check .",
-		"format": "biome check --write ."
-	},
-	"devDependencies": {
-		"@biomejs/biome": "^2.6.6",
-		"@types/node": "^24.19.2",
-		"typescript": "^7.0.2"
-	}
+  "name": "game-ledger",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "wallet"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test --workspaces --if-present",
+    "lint": "biome check .",
+    "format": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.6",
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2"
+  }
 }
