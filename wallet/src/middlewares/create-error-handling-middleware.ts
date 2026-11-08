@@ -1,9 +1,18 @@
 import type { ErrorRequestHandler } from "express";
+import { z } from "zod";
 
 export const createErrorHandlingMiddleware = (): ErrorRequestHandler => {
   return (err, _req, res, next) => {
     if (res.headersSent) {
       return next(err);
+    }
+
+    if (err instanceof z.ZodError) {
+      res.status(400).json({
+        error: "invalid_request",
+        issues: z.flattenError(err).fieldErrors,
+      });
+      return;
     }
 
     const status = err.status ?? err.statusCode;
