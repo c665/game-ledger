@@ -2,13 +2,36 @@ services:
   db:
     image: postgres:18
     environment:
-      POSTGRES_USER: ledger
-      POSTGRES_PASSWORD: ledger
-      POSTGRES_DB: ledger
+      # Superuser "postgres". Each service connects with its own role instead.
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      # Creates each service's role and database on first start. :z for SELinux hosts.
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro,z
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ledger"]
+      # Over TCP, not the socket: while the init scripts run, the image's temporary
+      # server only listens on the socket, so this stays unhealthy until they finish.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
       interval: 2s
       timeout: 2s
       retries: 20
+
+  # Migration tool, not a long-running service. Run with: npm run sqitch -- <command>
+  sqitch:
+    image: sqitch/sqitch:v1.6.1
+    profiles: [tools]
+    # Root so files it creates (sqitch add) belong to current user under rootless Podman/Docker
+    user: root
+    volumes:
+      # :z lets SELinux hosts mount the folder.
+      - ./wallet/db:/repo:z
+    environment:
+      SQITCH_TARGET: db:pg://db:5432/wallet
+      SQITCH_USERNAME: wallet
+      SQITCH_PASSWORD: wallet
+      SQITCH_FULLNAME: ${SQITCH_FULLNAME:-}
+      SQITCH_EMAIL: ${SQITCH_EMAIL:-}
+    depends_on:
+      db:
+        condition: service_healthy

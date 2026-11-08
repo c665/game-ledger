@@ -11,7 +11,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
     "lint": "biome check .",
-    "format": "biome check --write ."
+    "format": "biome check --write .",
+    "sqitch": "SQITCH_FULLNAME=\"$(git config user.name)\" SQITCH_EMAIL=\"$(git config user.email)\" docker compose run --rm sqitch",
+    "db:deploy": "npm run sqitch -- deploy"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",

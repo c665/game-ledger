@@ -29,6 +29,8 @@ npm run lint                  # Biome: lint and format check
 npm run format                # Biome: apply fixes
 npm run dev -w wallet         # run one service with reload
 docker compose up -d --wait   # PostgreSQL on localhost:5433
+npm run db:deploy             # apply database migrations (Sqitch via Docker)
+npm run sqitch -- <command>   # any other Sqitch command: add, status, revert
 ```
 
 Before you commit, `npm run lint`, `npm run typecheck` and `npm test` must pass. Say in your summary what you ran and what you did not.
