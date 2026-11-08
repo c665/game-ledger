@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      # Start Postgres early; it boots while dependencies install.
+      - run: docker compose up -d db
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -24,7 +26,12 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      # Waits for the database to be healthy, then applies and verifies every migration.
+      - run: npm run db:deploy
       - run: npm test
+        env:
+          DB_USER: wallet
+          DB_PASSWORD: wallet
 
   terraform:
     runs-on: ubuntu-latest

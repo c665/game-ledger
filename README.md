@@ -47,3 +47,15 @@ Then initialise the main stack:
 cd infra
 terraform init -backend-config=state.s3.tfbackend
 ```
+
+## Known limitations
+
+### Wallet
+
+#### A transaction that arrives after its rollback is still applied
+
+A rollback names only the transaction it undoes. The wallet takes necessary info (wallet, amount) from that original transaction. If the original isn't in the ledger, the wallet rejects the rollback.
+
+That leaves one gap. If a transaction times out on the caller's side, the caller rolls it back, and the original then reaches the wallet late (delayed or retried), the wallet has already rejected the rollback and now applies the transaction. Money moves for a transaction the caller considers cancelled.
+
+This takes a timeout followed by a delayed request, so it should be rare, but it is a real correctness gap and is accepted for now. The planned fix: the wallet records a rollback of an unknown transaction as a tombstone (the transaction is cancelled and no money moves), rejects any later transaction whose ID has a tombstone, and makes a transaction and its rollback coordinate on the transaction ID (for example with `SERIALIZABLE` isolation), so they can't both commit when they race.

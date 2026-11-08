@@ -7,7 +7,7 @@
     "dev": "node --env-file-if-exists=.env --watch src/index.ts",
     "start": "node --env-file-if-exists=.env src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"test/**/*.test.ts\""
+    "test": "node --env-file-if-exists=.env --test \"test/**/*.test.ts\""
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
