@@ -26,8 +26,10 @@ export type AppendResult =
 
 export interface LedgerRepository {
   findLatest(userId: string, currencyCode: string): Promise<LedgerEntry | null>;
+
   findByExternalReference(
     externalReference: string,
   ): Promise<LedgerEntry | null>;
+
   append(entry: NewLedgerEntry): Promise<AppendResult>;
 }
