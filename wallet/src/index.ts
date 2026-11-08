@@ -24,7 +24,28 @@ const server = app.listen(port, () => {
 // If that hangs, exit anyway so the orchestrator isn't left waiting.
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
+let shuttingDown = false;
+
+// server.close() only closes the keep-alive connections that are idle at that
+// moment. Close the rest as their responses finish, or they hold shutdown up
+// until they time out.
+server.on("request", (_req, res) => {
+  res.on("finish", () => {
+    if (shuttingDown) {
+      server.closeIdleConnections();
+    }
+  });
+});
+
 const shutdown = (signal: NodeJS.Signals) => {
+  // A second Ctrl-C, or SIGINT after SIGTERM, must not start a second shutdown
+  // or reach Node's default handler, which would kill requests in flight.
+  if (shuttingDown) {
+    console.log(`${signal} received, already shutting down`);
+    return;
+  }
+  shuttingDown = true;
+
   console.log(`${signal} received, shutting down`);
 
   setTimeout(() => {
@@ -38,5 +59,5 @@ const shutdown = (signal: NodeJS.Signals) => {
   });
 };
 
-process.once("SIGTERM", shutdown);
-process.once("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
