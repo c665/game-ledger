@@ -7,8 +7,14 @@ export const createDbPool = () => {
 
   const { db } = config;
 
-  return new pg.Pool({
+  const pool = new pg.Pool({
     ...db,
     types,
   });
+
+  pool.on("error", (err) => {
+    console.error("Unexpected error on idle client", err);
+  });
+
+  return pool;
 };
