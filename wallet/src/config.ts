@@ -27,6 +27,6 @@ export const config = {
     database: process.env.DB_NAME || "wallet",
   },
   server: {
-    port: port("SERVER_PORT", 3000),
+    port: port("PORT", 3000),
   },
 };
