@@ -2,3 +2,4 @@
 %project=wallet
 
 wallet_schema 2026-11-08T11:44:08Z c665 <cosmin665@gmail.com> # initializing wallet schema
+ledger_table [wallet_schema] 2026-11-08T11:59:33Z c665 <cosmin665@gmail.com> # transactions ledger table
