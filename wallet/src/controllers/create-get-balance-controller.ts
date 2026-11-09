@@ -1,5 +1,4 @@
 import type { RequestHandler } from "express";
-import { z } from "zod";
 import type { WalletService } from "../service/wallet-service.ts";
 import { getBalanceRequest } from "./schemas.ts";
 

@@ -1,8 +1,11 @@
+import type { TransactionInputs, WalletKey } from "../domain/types.ts";
 import type { LedgerRepository } from "../repository/ledger-repository.ts";
-import type { WalletKey } from "./types.ts";
+import { createCreditService } from "./credit.ts";
+import type { TransactionResult } from "./types.ts";
 
 export interface WalletService {
   getBalance(key: WalletKey): Promise<bigint>;
+  credit(input: TransactionInputs): Promise<TransactionResult>;
 }
 
 export const createWalletService: (
@@ -20,5 +23,6 @@ export const createWalletService: (
 
   return {
     getBalance,
+    credit: createCreditService(ledgerRepository),
   };
 };

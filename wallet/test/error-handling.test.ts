@@ -16,6 +16,9 @@ describe("error handling", () => {
     getBalance: async () => {
       throw new Error("connect ECONNREFUSED secret-db:5432");
     },
+    credit: async (_input) => {
+      throw new Error("connect ECONNREFUSED secret-db:5432");
+    },
   };
 
   before(() => {
