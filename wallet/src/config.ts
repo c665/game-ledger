@@ -1,18 +1,29 @@
 import { z } from "zod";
 
-const port = z.coerce.number().int().min(1).max(65535);
+const int = (min: number, max: number) =>
+  z
+    .string()
+    .regex(/^\d+$/, "must be a whole number")
+    .transform(Number)
+    .pipe(z.number().min(min).max(max));
+
+const port = int(1, 65535);
 
 const env = z.object({
-  DB_HOST: z.string().min(1).default("localhost"),
+  DB_HOST: z.string().default("localhost"),
   DB_PORT: port.default(5433),
-  DB_USER: z.string().min(1),
-  DB_PASSWORD: z.string().min(1),
-  DB_NAME: z.string().min(1).default("wallet"),
+  DB_USER: z.string(),
+  DB_PASSWORD: z.string(),
+  DB_NAME: z.string().default("wallet"),
   PORT: port.default(3000),
-  TRANSACTION_RETRY_ATTEMPTS: z.coerce.number().int().min(0).default(3),
+  TRANSACTION_RETRY_ATTEMPTS: int(0, 10).default(3),
 });
 
-const parsed = env.safeParse(process.env);
+const setVariables = Object.fromEntries(
+  Object.entries(process.env).filter(([, value]) => value !== ""),
+);
+
+const parsed = env.safeParse(setVariables);
 
 if (!parsed.success) {
   throw new Error(`Invalid environment:\n${z.prettifyError(parsed.error)}`);
