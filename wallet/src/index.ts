@@ -11,7 +11,9 @@ console.log("Config loaded:", {
 
 const dbPool = createDbPool();
 const ledgerRepository = createPgLedgerRepository(dbPool);
-const walletService = createWalletService(ledgerRepository);
+const walletService = createWalletService(ledgerRepository, {
+  transactionRetryAttempts: config.domain.transactionRetryAttempts,
+});
 
 const app = createApp({ walletService });
 const port = config.server.port;

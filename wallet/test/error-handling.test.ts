@@ -16,6 +16,9 @@ describe("error handling", () => {
     getBalance: async () => {
       throw new Error("connect ECONNREFUSED secret-db:5432");
     },
+    credit: async (_input) => {
+      throw new Error("connect ECONNREFUSED secret-db:5432");
+    },
   };
 
   before(() => {
@@ -29,24 +32,37 @@ describe("error handling", () => {
     server.close();
   });
 
-  it("returns a JSON 500 with an errorId, and logs the error under it", async (t) => {
-    const logged = t.mock.method(console, "error", () => {});
+  const failingRequests = {
+    "GET balance": () =>
+      fetch(`${baseUrl}/wallets/${randomUUID()}/EUR/balance`),
+    "POST credit": () =>
+      fetch(`${baseUrl}/wallets/${randomUUID()}/EUR/credit`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ amount: "1", externalReference: "ref" }),
+      }),
+  };
 
-    const res = await fetch(`${baseUrl}/wallets/${randomUUID()}/EUR/balance`);
+  for (const [name, request] of Object.entries(failingRequests)) {
+    it(`returns a JSON 500 with an errorId on ${name}, and logs the error under it`, async (t) => {
+      const logged = t.mock.method(console, "error", () => {});
 
-    assert.equal(res.status, 500);
-    assert.match(res.headers.get("content-type") ?? "", /^application\/json/);
-    const body = await res.json();
-    assert.equal(body.error, "internal_error");
-    assert.match(body.errorId, /^[0-9a-f-]{36}$/);
-    assert.deepEqual(Object.keys(body).sort(), ["error", "errorId"]);
+      const res = await request();
 
-    assert.equal(logged.mock.callCount(), 1);
-    assert.match(
-      String(logged.mock.calls[0]?.arguments[0]),
-      new RegExp(body.errorId),
-    );
-  });
+      assert.equal(res.status, 500);
+      assert.match(res.headers.get("content-type") ?? "", /^application\/json/);
+      const body = await res.json();
+      assert.equal(body.error, "internal_error");
+      assert.match(body.errorId, /^[0-9a-f-]{36}$/);
+      assert.deepEqual(Object.keys(body).sort(), ["error", "errorId"]);
+
+      assert.equal(logged.mock.callCount(), 1);
+      assert.match(
+        String(logged.mock.calls[0]?.arguments[0]),
+        new RegExp(body.errorId),
+      );
+    });
+  }
 
   it("returns a JSON 400 for a URL that can't be decoded", async () => {
     const res = await fetch(`${baseUrl}/wallets/%E0%A4%A/EUR/balance`);

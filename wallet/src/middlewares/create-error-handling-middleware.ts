@@ -8,9 +8,11 @@ export const createErrorHandlingMiddleware = (): ErrorRequestHandler => {
     }
 
     if (err instanceof z.ZodError) {
+      const { formErrors, fieldErrors } = z.flattenError(err);
       res.status(400).json({
         error: "invalid_request",
-        issues: z.flattenError(err).fieldErrors,
+        issues: fieldErrors,
+        ...(formErrors.length > 0 ? { formErrors } : {}),
       });
       return;
     }

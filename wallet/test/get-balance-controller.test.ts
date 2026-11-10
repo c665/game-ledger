@@ -4,7 +4,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { createApp } from "../src/app.ts";
-import type { WalletKey } from "../src/service/types.ts";
+import type { WalletKey } from "../src/domain/types.ts";
 import type { WalletService } from "../src/service/wallet-service.ts";
 
 // HTTP layer only: the service is a fake, so no database is needed.
@@ -18,6 +18,9 @@ describe("GET /wallets/:userId/:currencyCode/balance", () => {
     getBalance: async (key) => {
       calls.push(key);
       return 123n;
+    },
+    credit: async (_input) => {
+      throw new Error("not implemented");
     },
   };
 
