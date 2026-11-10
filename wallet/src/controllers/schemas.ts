@@ -1,11 +1,10 @@
 import { z } from "zod";
+import { MAX_BIGINT } from "../domain/types.ts";
 import type { LedgerEntry } from "../repository/ledger-repository.ts";
 import type { TransactionStatus } from "../service/types.ts";
 
-const MAX_BIGINT = 2n ** 63n - 1n;
-
 const walletKey = {
-  userId: z.uuid(),
+  userId: z.uuid().transform((id) => id.toLowerCase()),
   currencyCode: z.string().regex(/^[A-Z]{3}$/, "must be an ISO 4217 code"),
 };
 
@@ -27,7 +26,11 @@ const amount = z
 // Credits and debits take the same body; the route decides the direction.
 export const transactionBody = z.object({
   amount,
-  externalReference: z.string().min(1).max(255),
+  externalReference: z
+    .string()
+    .min(1)
+    .max(255)
+    .refine((value) => !value.includes("\0"), "must not contain NUL"),
 });
 
 export const toHttpStatus = (status: TransactionStatus) => {
@@ -39,16 +42,18 @@ export const toHttpStatus = (status: TransactionStatus) => {
     case "created":
       return 201;
     case "insufficient_funds":
+    case "balance_limit_exceeded":
       return 422;
   }
 };
 
-export const toEntryResponse = (entry: LedgerEntry) => {
-  return {
-    status: "success",
-    ...entry,
-    amount: entry.amount.toString(),
-    balance: entry.balance.toString(),
-    version: entry.version.toString(),
-  };
-};
+export const toEntryResponse = (entry: LedgerEntry) => ({
+  id: entry.id,
+  userId: entry.userId,
+  currencyCode: entry.currencyCode,
+  transactionType: entry.transactionType,
+  amount: entry.amount.toString(),
+  balance: entry.balance.toString(),
+  externalReference: entry.externalReference,
+  createdAt: entry.createdAt.toISOString(),
+});
