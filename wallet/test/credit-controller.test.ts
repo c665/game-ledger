@@ -191,6 +191,18 @@ describe("POST /wallets/:userId/:currencyCode/credit", () => {
     assert.deepEqual(calls, []);
   });
 
+  it("says what is wrong when the body is missing", async () => {
+    const res = await fetch(`${baseUrl}/wallets/${randomUUID()}/EUR/credit`, {
+      method: "POST",
+    });
+
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.deepEqual(body.issues, {});
+    assert.equal(body.formErrors.length, 1);
+    assert.deepEqual(calls, []);
+  });
+
   it("rejects an invalid wallet in the path without calling the service", async () => {
     const res = await credit("not-a-uuid", "eur", validBody());
 
