@@ -30,7 +30,8 @@ export const transactionBody = z.object({
     .string()
     .min(1)
     .max(255)
-    .refine((value) => !value.includes("\0"), "must not contain NUL"),
+    .regex(/^\P{Cc}+$/u, "must not contain control characters")
+    .refine((value) => value.isWellFormed(), "must be well-formed Unicode"),
 });
 
 export const toHttpStatus = (status: TransactionStatus) => {

@@ -132,18 +132,24 @@ describe("POST /wallets/:userId/:currencyCode/credit", () => {
     assert.equal(calls[0]?.userId, userId);
   });
 
-  it("rejects a NUL character in the external reference", async () => {
-    const res = await credit(randomUUID(), "EUR", {
-      amount: "100",
-      externalReference: "abc\u0000def",
-    });
+  for (const [name, externalReference] of [
+    ["a NUL", "abc\u0000def"],
+    ["a newline", "abc\ndef"],
+    ["a lone surrogate", "abc\ud800"],
+  ]) {
+    it(`rejects ${name} in the external reference`, async () => {
+      const res = await credit(randomUUID(), "EUR", {
+        amount: "100",
+        externalReference,
+      });
 
-    assert.equal(res.status, 400);
-    assert.deepEqual(Object.keys((await res.json()).issues), [
-      "externalReference",
-    ]);
-    assert.deepEqual(calls, []);
-  });
+      assert.equal(res.status, 400);
+      assert.deepEqual(Object.keys((await res.json()).issues), [
+        "externalReference",
+      ]);
+      assert.deepEqual(calls, []);
+    });
+  }
 
   it("takes the wallet from the path, not the body", async () => {
     result = { status: "created", entry: entry() };
