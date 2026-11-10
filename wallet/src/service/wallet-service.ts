@@ -8,9 +8,14 @@ export interface WalletService {
   credit(input: TransactionInputs): Promise<TransactionResult>;
 }
 
+export type WalletServiceOptions = {
+  transactionRetryAttempts: number;
+};
+
 export const createWalletService: (
   ledgerRepository: LedgerRepository,
-) => WalletService = (ledgerRepository) => {
+  options: WalletServiceOptions,
+) => WalletService = (ledgerRepository, { transactionRetryAttempts }) => {
   const getBalance = async ({ userId, currencyCode }: WalletKey) => {
     const latestEntry = await ledgerRepository.findLatest(userId, currencyCode);
 
@@ -23,6 +28,6 @@ export const createWalletService: (
 
   return {
     getBalance,
-    credit: createCreditService(ledgerRepository),
+    credit: createCreditService(ledgerRepository, transactionRetryAttempts),
   };
 };
