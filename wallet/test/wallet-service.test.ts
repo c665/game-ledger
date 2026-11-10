@@ -246,5 +246,20 @@ describe("wallet service", () => {
       assert.deepEqual(result, { status: "balance_limit_exceeded" });
       assert.equal(await service.getBalance(input), MAX_BIGINT);
     });
+
+    it("replays or conflicts before refusing, so a booked credit isn't reported as refused", async () => {
+      const input = creditInput();
+      const first = await service.credit(input);
+      assert.ok(first.status === "created");
+      await service.credit(
+        creditInput({ userId: input.userId, amount: MAX_BIGINT - 100n }),
+      );
+
+      const retry = await service.credit(input);
+      const reuse = await service.credit({ ...input, amount: 5n });
+
+      assert.deepEqual(retry, { status: "replayed", entry: first.entry });
+      assert.deepEqual(reuse, { status: "conflict" });
+    });
   });
 });

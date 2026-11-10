@@ -2,12 +2,33 @@ import { createCreditEntry } from "../domain/commands/credit.ts";
 import type { TransactionInputs } from "../domain/types.ts";
 import type { LedgerRepository } from "../repository/ledger-repository.ts";
 import { replay } from "./replay.ts";
-import type { TransactionResult } from "./types.ts";
+import type { ReplayResult, TransactionResult } from "./types.ts";
 
 export const createCreditService = (
   ledgerRepository: LedgerRepository,
   retryAttempts: number,
 ) => {
+  const findReplay = async (
+    input: TransactionInputs,
+  ): Promise<ReplayResult | null> => {
+    const stored = await ledgerRepository.findByExternalReference(
+      input.externalReference,
+    );
+
+    if (!stored) {
+      return null;
+    }
+
+    return replay({
+      stored,
+      input,
+      expected: {
+        transactionType: "credit",
+        amount: input.amount,
+      },
+    });
+  };
+
   const credit = async (
     input: TransactionInputs,
     attempt: number,
@@ -23,6 +44,12 @@ export const createCreditService = (
     const decision = createCreditEntry({ input, latest });
 
     if (!decision.ok) {
+      const replayed = await findReplay(input);
+
+      if (replayed) {
+        return replayed;
+      }
+
       console.log(
         `credit-refused userId=${userId} currencyCode=${currencyCode} amount=${amount} externalReference=${externalReference} reason=${decision.reason}`,
       );
@@ -43,18 +70,10 @@ export const createCreditService = (
       };
     }
 
-    const stored =
-      await ledgerRepository.findByExternalReference(externalReference);
+    const replayed = await findReplay(input);
 
-    if (stored) {
-      return replay({
-        stored,
-        input,
-        expected: {
-          transactionType: "credit",
-          amount,
-        },
-      });
+    if (replayed) {
+      return replayed;
     }
 
     if (result.reason !== "version_conflict") {
