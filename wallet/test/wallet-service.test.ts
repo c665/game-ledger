@@ -176,7 +176,7 @@ describe("wallet service", () => {
       );
     });
 
-    it("gives up after the configured retries", async () => {
+    it("reports busy after the configured retries", async () => {
       let appends = 0;
       const alwaysConflicting: LedgerRepository = {
         findLatest: async () => null,
@@ -191,7 +191,9 @@ describe("wallet service", () => {
         transactionRetryAttempts: retries,
       });
 
-      await assert.rejects(failing.credit(creditInput()), /after 3 attempts/);
+      const result = await failing.credit(creditInput());
+
+      assert.deepEqual(result, { status: "busy" });
       assert.equal(appends, retries + 1);
     });
 

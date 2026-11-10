@@ -87,12 +87,10 @@ export const createCreditService = (
     }
 
     console.log(
-      `credit-failure userId=${userId} currencyCode=${currencyCode} amount=${amount} externalReference=${externalReference} reason=${result.reason}`,
+      `credit-failure userId=${userId} currencyCode=${currencyCode} amount=${amount} externalReference=${externalReference} attempts=${attempt + 1}`,
     );
 
-    throw new Error(
-      `credit failure after ${attempt + 1} attempts, all version conflicts`,
-    );
+    return { status: "busy" };
   };
 
   return (input: TransactionInputs) => credit(input, 0);

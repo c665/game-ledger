@@ -123,6 +123,16 @@ describe("POST /wallets/:userId/:currencyCode/credit", () => {
     assert.deepEqual(await res.json(), { error: "balance_limit_exceeded" });
   });
 
+  it("returns 503 with Retry-After when the wallet is busy", async () => {
+    result = { status: "busy" };
+
+    const res = await credit(randomUUID(), "EUR", validBody());
+
+    assert.equal(res.status, 503);
+    assert.equal(res.headers.get("retry-after"), "1");
+    assert.deepEqual(await res.json(), { error: "busy" });
+  });
+
   it("lowercases the user ID so replays match the stored row", async () => {
     result = { status: "created", entry: entry() };
     const userId = randomUUID();

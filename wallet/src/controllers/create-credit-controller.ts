@@ -25,8 +25,13 @@ export const createCreditController: (
 
     if (result.status === "created" || result.status === "replayed") {
       res.status(status).json({ entry: toEntryResponse(result.entry) });
-    } else {
-      res.status(status).json({ error: result.status });
+      return;
     }
+
+    if (result.status === "busy") {
+      res.set("Retry-After", "1");
+    }
+
+    res.status(status).json({ error: result.status });
   };
 };

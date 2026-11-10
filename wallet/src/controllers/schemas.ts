@@ -45,6 +45,8 @@ export const toHttpStatus = (status: TransactionStatus) => {
     case "insufficient_funds":
     case "balance_limit_exceeded":
       return 422;
+    case "busy":
+      return 503;
   }
 };
 
