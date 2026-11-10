@@ -26,7 +26,7 @@ export const createCreditController: (
     if (result.status === "created" || result.status === "replayed") {
       res.status(status).json({ entry: toEntryResponse(result.entry) });
     } else {
-      res.status(status).json({ status: result.status });
+      res.status(status).json({ error: result.status });
     }
   };
 };
