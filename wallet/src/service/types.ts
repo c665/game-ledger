@@ -9,6 +9,7 @@ export type ReplayResult =
 export type TransactionResult =
   | { status: "created"; entry: LedgerEntry }
   | ReplayResult
-  | { status: "insufficient_funds" };
+  | { status: "insufficient_funds" }
+  | { status: "balance_limit_exceeded" };
 
 export type TransactionStatus = TransactionResult["status"];

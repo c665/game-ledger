@@ -1,11 +1,13 @@
-import { config } from "../config.ts";
 import { createCreditEntry } from "../domain/commands/credit.ts";
 import type { TransactionInputs } from "../domain/types.ts";
 import type { LedgerRepository } from "../repository/ledger-repository.ts";
 import { replay } from "./replay.ts";
 import type { TransactionResult } from "./types.ts";
 
-export const createCreditService = (ledgerRepository: LedgerRepository) => {
+export const createCreditService = (
+  ledgerRepository: LedgerRepository,
+  retryAttempts: number,
+) => {
   const credit = async (
     input: TransactionInputs,
     attempt: number,
@@ -18,12 +20,17 @@ export const createCreditService = (ledgerRepository: LedgerRepository) => {
 
     const latest = await ledgerRepository.findLatest(userId, currencyCode);
 
-    const result = await ledgerRepository.append(
-      createCreditEntry({
-        input,
-        latest,
-      }),
-    );
+    const decision = createCreditEntry({ input, latest });
+
+    if (!decision.ok) {
+      console.log(
+        `credit-refused userId=${userId} currencyCode=${currencyCode} amount=${amount} externalReference=${externalReference} reason=${decision.reason}`,
+      );
+
+      return { status: decision.reason };
+    }
+
+    const result = await ledgerRepository.append(decision.entry);
 
     if (result.ok) {
       console.log(
@@ -36,9 +43,12 @@ export const createCreditService = (ledgerRepository: LedgerRepository) => {
       };
     }
 
-    if (result.reason === "duplicate_external_reference") {
+    const stored =
+      await ledgerRepository.findByExternalReference(externalReference);
+
+    if (stored) {
       return replay({
-        ledgerRepository,
+        stored,
         input,
         expected: {
           transactionType: "credit",
@@ -47,8 +57,13 @@ export const createCreditService = (ledgerRepository: LedgerRepository) => {
       });
     }
 
-    // version_conflict is the last remaining failrue reason
-    if (attempt < config.domain.transactionRetryAttempts) {
+    if (result.reason !== "version_conflict") {
+      throw new Error(
+        `credit: unexpected append failure ${result.reason} for externalReference=${externalReference}`,
+      );
+    }
+
+    if (attempt < retryAttempts) {
       return credit(input, attempt + 1);
     }
 
@@ -57,7 +72,7 @@ export const createCreditService = (ledgerRepository: LedgerRepository) => {
     );
 
     throw new Error(
-      `credit failure after ${config.domain.transactionRetryAttempts} version conflicts`,
+      `credit failure after ${attempt + 1} attempts, all version conflicts`,
     );
   };
 

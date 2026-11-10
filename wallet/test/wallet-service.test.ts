@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import type { Pool } from "pg";
-import { config } from "../src/config.ts";
 import { createDbPool } from "../src/db/create-db-pool.ts";
-import type { TransactionInputs } from "../src/domain/types.ts";
-import type { LedgerRepository } from "../src/repository/ledger-repository.ts";
+import { MAX_BIGINT, type TransactionInputs } from "../src/domain/types.ts";
+import type {
+  AppendResult,
+  LedgerRepository,
+} from "../src/repository/ledger-repository.ts";
 import { createPgLedgerRepository } from "../src/repository/pg-ledger-repository.ts";
 import {
   createWalletService,
@@ -15,6 +17,28 @@ import {
 // Runs against the real database: `docker compose up -d --wait` and
 // `npm run db:deploy` first.
 
+// Pinned rather than read from the environment, so the tests don't change
+// with a developer's .env.
+const RETRIES = 3;
+
+// Wraps a repository and counts the version conflicts append reports.
+const countingConflicts = (repo: LedgerRepository) => {
+  let conflicts = 0;
+  return {
+    repo: {
+      ...repo,
+      append: async (entry) => {
+        const result: AppendResult = await repo.append(entry);
+        if (!result.ok && result.reason === "version_conflict") {
+          conflicts++;
+        }
+        return result;
+      },
+    } satisfies LedgerRepository,
+    conflicts: () => conflicts,
+  };
+};
+
 describe("wallet service", () => {
   let pool: Pool;
   let repo: LedgerRepository;
@@ -23,7 +47,7 @@ describe("wallet service", () => {
   before(() => {
     pool = createDbPool();
     repo = createPgLedgerRepository(pool);
-    service = createWalletService(repo);
+    service = createWalletService(repo, { transactionRetryAttempts: RETRIES });
   });
 
   after(async () => {
@@ -121,15 +145,21 @@ describe("wallet service", () => {
       // Each loss means another writer committed first, so a writer loses at
       // most (writers - 1) times. With one writer more than the retries, every
       // credit must still succeed.
-      const writers = config.domain.transactionRetryAttempts + 1;
+      const writers = RETRIES + 1;
+      const counting = countingConflicts(repo);
+      const concurrentService = createWalletService(counting.repo, {
+        transactionRetryAttempts: RETRIES,
+      });
       const { userId } = creditInput();
 
       const results = await Promise.all(
         Array.from({ length: writers }, () =>
-          service.credit(creditInput({ userId, amount: 10n })),
+          concurrentService.credit(creditInput({ userId, amount: 10n })),
         ),
       );
 
+      // Without a conflict, the retry path didn't run and the test proved nothing.
+      assert.ok(counting.conflicts() > 0, "expected at least one conflict");
       assert.ok(results.every((result) => result.status === "created"));
       const versions = results
         .map((result) =>
@@ -144,6 +174,77 @@ describe("wallet service", () => {
         await service.getBalance({ userId, currencyCode: "EUR" }),
         BigInt(writers) * 10n,
       );
+    });
+
+    it("gives up after the configured retries", async () => {
+      let appends = 0;
+      const alwaysConflicting: LedgerRepository = {
+        findLatest: async () => null,
+        findByExternalReference: async () => null,
+        append: async () => {
+          appends++;
+          return { ok: false, reason: "version_conflict" };
+        },
+      };
+      const retries = 2;
+      const failing = createWalletService(alwaysConflicting, {
+        transactionRetryAttempts: retries,
+      });
+
+      await assert.rejects(failing.credit(creditInput()), /after 3 attempts/);
+      assert.equal(appends, retries + 1);
+    });
+
+    it("replays a stored request even when the version conflict is reported", async () => {
+      const input = creditInput();
+      const first = await service.credit(input);
+      assert.ok(first.status === "created");
+
+      // A stale read: the retry computes version 1 again, which breaks both
+      // unique constraints. Postgres reports the version one.
+      const staleRepo: LedgerRepository = {
+        ...repo,
+        findLatest: async () => null,
+      };
+      const stale = await repo.append(first.entry);
+      assert.deepEqual(stale, { ok: false, reason: "version_conflict" });
+      // With no retries, only the reference lookup can turn this into a replay.
+      const staleService = createWalletService(staleRepo, {
+        transactionRetryAttempts: 0,
+      });
+
+      const result = await staleService.credit(input);
+
+      assert.deepEqual(result, { status: "replayed", entry: first.entry });
+    });
+
+    it("reports a conflict when another wallet reuses the reference", async () => {
+      const input = creditInput();
+      await service.credit(input);
+
+      const otherUser = await service.credit({
+        ...input,
+        userId: randomUUID(),
+      });
+      const otherCurrency = await service.credit({
+        ...input,
+        currencyCode: "USD",
+      });
+
+      assert.deepEqual(otherUser, { status: "conflict" });
+      assert.deepEqual(otherCurrency, { status: "conflict" });
+    });
+
+    it("refuses a credit that would overflow the balance", async () => {
+      const input = creditInput({ amount: MAX_BIGINT });
+      await service.credit(input);
+
+      const result = await service.credit(
+        creditInput({ userId: input.userId, amount: 1n }),
+      );
+
+      assert.deepEqual(result, { status: "balance_limit_exceeded" });
+      assert.equal(await service.getBalance(input), MAX_BIGINT);
     });
   });
 });

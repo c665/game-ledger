@@ -1,32 +1,24 @@
 import type { TransactionInputs } from "../domain/types.ts";
 import type {
-  LedgerRepository,
+  LedgerEntry,
   TransactionType,
 } from "../repository/ledger-repository.ts";
 import type { ReplayResult } from "./types.ts";
 
-export const replay = async ({
-  ledgerRepository,
+// The request's externalReference is already stored. Decide whether this
+// request is a retry of that one or a reuse of the reference for something else.
+export const replay = ({
+  stored,
   input,
   expected,
 }: {
-  ledgerRepository: LedgerRepository;
+  stored: LedgerEntry;
   input: TransactionInputs;
   expected: {
     transactionType: TransactionType;
     amount: bigint;
   };
-}): Promise<ReplayResult> => {
-  const stored = await ledgerRepository.findByExternalReference(
-    input.externalReference,
-  );
-
-  if (!stored) {
-    throw new Error(
-      `no entry for duplicate externalReference=${input.externalReference}`,
-    );
-  }
-
+}): ReplayResult => {
   const sameRequest =
     stored.userId === input.userId &&
     stored.currencyCode === input.currencyCode &&

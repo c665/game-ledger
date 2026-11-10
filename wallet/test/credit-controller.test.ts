@@ -64,7 +64,7 @@ describe("POST /wallets/:userId/:currencyCode/credit", () => {
 
   const validBody = () => ({ amount: "100", externalReference: randomUUID() });
 
-  it("returns 201 with the new entry, numbers as strings", async () => {
+  it("returns 201 with only the public fields, numbers as strings", async () => {
     const created = entry();
     result = { status: "created", entry: created };
     const userId = randomUUID();
@@ -73,11 +73,18 @@ describe("POST /wallets/:userId/:currencyCode/credit", () => {
     const res = await credit(userId, "EUR", body);
 
     assert.equal(res.status, 201);
-    const { entry: sent } = await res.json();
-    assert.equal(sent.id, created.id);
-    assert.equal(sent.amount, "100");
-    assert.equal(sent.balance, "250");
-    assert.equal(sent.version, "3");
+    assert.deepEqual(await res.json(), {
+      entry: {
+        id: created.id,
+        userId: created.userId,
+        currencyCode: "EUR",
+        transactionType: "credit",
+        amount: "100",
+        balance: "250",
+        externalReference: created.externalReference,
+        createdAt: created.createdAt.toISOString(),
+      },
+    });
     assert.deepEqual(calls, [
       {
         userId,
@@ -104,7 +111,38 @@ describe("POST /wallets/:userId/:currencyCode/credit", () => {
     const res = await credit(randomUUID(), "EUR", validBody());
 
     assert.equal(res.status, 409);
-    assert.deepEqual(await res.json(), { status: "conflict" });
+    assert.deepEqual(await res.json(), { error: "conflict" });
+  });
+
+  it("returns 422 when the balance would overflow", async () => {
+    result = { status: "balance_limit_exceeded" };
+
+    const res = await credit(randomUUID(), "EUR", validBody());
+
+    assert.equal(res.status, 422);
+    assert.deepEqual(await res.json(), { error: "balance_limit_exceeded" });
+  });
+
+  it("lowercases the user ID so replays match the stored row", async () => {
+    result = { status: "created", entry: entry() };
+    const userId = randomUUID();
+
+    await credit(userId.toUpperCase(), "EUR", validBody());
+
+    assert.equal(calls[0]?.userId, userId);
+  });
+
+  it("rejects a NUL character in the external reference", async () => {
+    const res = await credit(randomUUID(), "EUR", {
+      amount: "100",
+      externalReference: "abc\u0000def",
+    });
+
+    assert.equal(res.status, 400);
+    assert.deepEqual(Object.keys((await res.json()).issues), [
+      "externalReference",
+    ]);
+    assert.deepEqual(calls, []);
   });
 
   it("takes the wallet from the path, not the body", async () => {
