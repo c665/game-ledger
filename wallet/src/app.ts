@@ -1,6 +1,6 @@
 import express from "express";
-import { createCreditController } from "./controllers/create-credit-controller.ts";
 import { createGetBalanceController } from "./controllers/create-get-balance-controller.ts";
+import { createTransactionController } from "./controllers/create-transaction-controller.ts";
 import { createErrorHandlingMiddleware } from "./middlewares/create-error-handling-middleware.ts";
 import type { WalletService } from "./service/wallet-service.ts";
 
@@ -20,7 +20,7 @@ export function createApp({ walletService }: { walletService: WalletService }) {
 
   app.post(
     "/wallets/:userId/:currencyCode/credit",
-    createCreditController(walletService),
+    createTransactionController(walletService, "credit"),
   );
 
   app.use(createErrorHandlingMiddleware());

@@ -7,14 +7,17 @@ import {
   walletParams,
 } from "./schemas.ts";
 
-export const createCreditController: (
+// Credits and debits share a request and response shape; the route picks
+// which service method moves the money.
+export const createTransactionController: (
   walletService: WalletService,
-) => RequestHandler = (walletService) => {
+  transactionType: "credit" | "debit",
+) => RequestHandler = (walletService, transactionType) => {
   return async (req, res) => {
     const { userId, currencyCode } = walletParams.parse(req.params);
     const { amount, externalReference } = transactionBody.parse(req.body);
 
-    const result = await walletService.credit({
+    const result = await walletService[transactionType]({
       userId,
       currencyCode,
       amount,
