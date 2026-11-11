@@ -1,4 +1,5 @@
 import { createCreditEntry } from "../domain/commands/credit.ts";
+import { createDebitEntry } from "../domain/commands/debit.ts";
 import type { TransactionInputs, WalletKey } from "../domain/types.ts";
 import type { LedgerRepository } from "../repository/ledger-repository.ts";
 import { createTransactionService } from "./transaction.ts";
@@ -7,6 +8,7 @@ import type { TransactionResult } from "./types.ts";
 export interface WalletService {
   getBalance(key: WalletKey): Promise<bigint>;
   credit(input: TransactionInputs): Promise<TransactionResult>;
+  debit(input: TransactionInputs): Promise<TransactionResult>;
 }
 
 export type WalletServiceOptions = {
@@ -33,6 +35,11 @@ export const createWalletService: (
       ledgerRepository,
       transactionRetryAttempts,
       { transactionType: "credit", decide: createCreditEntry },
+    ),
+    debit: createTransactionService(
+      ledgerRepository,
+      transactionRetryAttempts,
+      { transactionType: "debit", decide: createDebitEntry },
     ),
   };
 };

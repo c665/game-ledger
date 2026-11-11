@@ -264,4 +264,157 @@ describe("wallet service", () => {
       assert.deepEqual(reuse, { status: "conflict" });
     });
   });
+
+  describe("debit", () => {
+    const debitInput = (overrides: Partial<TransactionInputs> = {}) => ({
+      userId: randomUUID(),
+      currencyCode: "EUR",
+      amount: 30n,
+      externalReference: randomUUID(),
+      ...overrides,
+    });
+
+    // A wallet holding `balance`, funded by one credit.
+    const fundedWallet = async (balance: bigint) => {
+      const userId = randomUUID();
+      const funded = await service.credit(
+        debitInput({ userId, amount: balance }),
+      );
+      assert.ok(funded.status === "created");
+      return userId;
+    };
+
+    it("subtracts from the latest balance and stores a negative amount", async () => {
+      const userId = await fundedWallet(100n);
+
+      const result = await service.debit(debitInput({ userId }));
+
+      assert.ok(result.status === "created");
+      assert.equal(result.entry.version, 2n);
+      assert.equal(result.entry.transactionType, "debit");
+      assert.equal(result.entry.amount, -30n);
+      assert.equal(result.entry.balance, 70n);
+      assert.equal(
+        await service.getBalance({ userId, currencyCode: "EUR" }),
+        70n,
+      );
+    });
+
+    it("allows a debit down to exactly zero", async () => {
+      const userId = await fundedWallet(30n);
+
+      const result = await service.debit(debitInput({ userId }));
+
+      assert.ok(result.status === "created");
+      assert.equal(result.entry.balance, 0n);
+    });
+
+    it("refuses a debit larger than the balance", async () => {
+      const userId = await fundedWallet(29n);
+
+      const result = await service.debit(debitInput({ userId }));
+
+      assert.deepEqual(result, { status: "insufficient_funds" });
+      assert.equal(
+        await service.getBalance({ userId, currencyCode: "EUR" }),
+        29n,
+      );
+    });
+
+    it("refuses a debit from a wallet with no entries, without writing a row", async () => {
+      const input = debitInput();
+
+      const result = await service.debit(input);
+
+      assert.deepEqual(result, { status: "insufficient_funds" });
+      assert.equal(await repo.findLatest(input.userId, "EUR"), null);
+    });
+
+    it("replays a repeated request without moving money again", async () => {
+      const userId = await fundedWallet(100n);
+      const input = debitInput({ userId });
+      const first = await service.debit(input);
+      assert.ok(first.status === "created");
+
+      const second = await service.debit(input);
+
+      assert.deepEqual(second, { status: "replayed", entry: first.entry });
+      assert.equal(
+        await service.getBalance({ userId, currencyCode: "EUR" }),
+        70n,
+      );
+    });
+
+    it("replays before refusing, so a debit that emptied the wallet isn't reported as refused", async () => {
+      const userId = await fundedWallet(30n);
+      const input = debitInput({ userId });
+      const first = await service.debit(input);
+      assert.ok(first.status === "created");
+
+      const retry = await service.debit(input);
+      const reuse = await service.debit({ ...input, amount: 5n });
+
+      assert.deepEqual(retry, { status: "replayed", entry: first.entry });
+      assert.deepEqual(reuse, { status: "conflict" });
+    });
+
+    it("reports a conflict when a credit's reference is reused for a debit", async () => {
+      const userId = await fundedWallet(100n);
+      const credit = debitInput({ userId });
+      await service.credit(credit);
+
+      const result = await service.debit(credit);
+
+      assert.deepEqual(result, { status: "conflict" });
+      assert.equal(
+        await service.getBalance({ userId, currencyCode: "EUR" }),
+        130n,
+      );
+    });
+
+    it("reports a conflict when a debit's reference is reused for a credit", async () => {
+      const userId = await fundedWallet(100n);
+      const debit = debitInput({ userId });
+      await service.debit(debit);
+
+      const result = await service.credit(debit);
+
+      assert.deepEqual(result, { status: "conflict" });
+      assert.equal(
+        await service.getBalance({ userId, currencyCode: "EUR" }),
+        70n,
+      );
+    });
+
+    it("never overdraws under concurrent debits", async () => {
+      // 100 covers three debits of 30. With enough retries that no writer
+      // gives up, exactly three land and the other two are refused.
+      const writers = 5;
+      const counting = countingConflicts(repo);
+      const concurrentService = createWalletService(counting.repo, {
+        transactionRetryAttempts: writers - 1,
+      });
+      const userId = await fundedWallet(100n);
+
+      const results = await Promise.all(
+        Array.from({ length: writers }, () =>
+          concurrentService.debit(debitInput({ userId })),
+        ),
+      );
+
+      assert.ok(counting.conflicts() > 0, "expected at least one conflict");
+      const statuses = results.map((result) => result.status).sort();
+      assert.deepEqual(statuses, [
+        "created",
+        "created",
+        "created",
+        "insufficient_funds",
+        "insufficient_funds",
+      ]);
+      assert.equal(
+        await service.getBalance({ userId, currencyCode: "EUR" }),
+        10n,
+      );
+    });
+  });
 });

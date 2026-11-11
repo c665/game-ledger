@@ -25,6 +25,9 @@ describe("POST /wallets/:userId/:currencyCode/credit", () => {
       calls.push(input);
       return result;
     },
+    debit: async () => {
+      throw new Error("not used");
+    },
   };
 
   before(() => {

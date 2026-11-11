@@ -22,6 +22,9 @@ describe("GET /wallets/:userId/:currencyCode/balance", () => {
     credit: async (_input) => {
       throw new Error("not implemented");
     },
+    debit: async (_input) => {
+      throw new Error("not implemented");
+    },
   };
 
   before(() => {

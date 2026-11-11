@@ -19,6 +19,9 @@ describe("error handling", () => {
     credit: async (_input) => {
       throw new Error("connect ECONNREFUSED secret-db:5432");
     },
+    debit: async (_input) => {
+      throw new Error("connect ECONNREFUSED secret-db:5432");
+    },
   };
 
   before(() => {
