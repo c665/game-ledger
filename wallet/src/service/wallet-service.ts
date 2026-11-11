@@ -1,6 +1,7 @@
+import { createCreditEntry } from "../domain/commands/credit.ts";
 import type { TransactionInputs, WalletKey } from "../domain/types.ts";
 import type { LedgerRepository } from "../repository/ledger-repository.ts";
-import { createCreditService } from "./credit.ts";
+import { createTransactionService } from "./transaction.ts";
 import type { TransactionResult } from "./types.ts";
 
 export interface WalletService {
@@ -28,6 +29,10 @@ export const createWalletService: (
 
   return {
     getBalance,
-    credit: createCreditService(ledgerRepository, transactionRetryAttempts),
+    credit: createTransactionService(
+      ledgerRepository,
+      transactionRetryAttempts,
+      { transactionType: "credit", decide: createCreditEntry },
+    ),
   };
 };
