@@ -23,6 +23,11 @@ export function createApp({ walletService }: { walletService: WalletService }) {
     createTransactionController(walletService, "credit"),
   );
 
+  app.post(
+    "/wallets/:userId/:currencyCode/debit",
+    createTransactionController(walletService, "debit"),
+  );
+
   app.use(createErrorHandlingMiddleware());
 
   return app;
